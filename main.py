@@ -324,6 +324,7 @@ async def handle_button_click(callback_query: CallbackQuery):
 
     elif selected_option in ['ha', 'yoq']:
         if selected_option == 'yoq':
+            await callback_query.message.delete()
             await callback_query.message.answer(
                 "❌ <b>Buyurtmangiz rad etildi.</b>\n"
                 "🔄 <i>Bot qayta ishga tushiriladi...</i>",
