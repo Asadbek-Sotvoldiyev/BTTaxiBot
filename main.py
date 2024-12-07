@@ -154,7 +154,7 @@ phone_button = ReplyKeyboardMarkup(
 
 
 async def send_welcome(message: Message):
-    button_order = KeyboardButton(text="🛍️ Buyurtma berish 🛒")
+    button_order = KeyboardButton(text="🚕 Buyurtma berish 🚕")
 
     menu = ReplyKeyboardMarkup(keyboard=[[button_order]], resize_keyboard=True)
 
@@ -237,7 +237,7 @@ async def handle_contact(message: Message):
     else:
         await send_welcome(message)
 
-@dp.message(F.text == "🛍️ Buyurtma berish 🛒")
+@dp.message(F.text == "🚕 Buyurtma berish 🚕")
 async def handle_order(message: Message):
     await message.answer(
         "🛒 <b>Buyurtma berish jarayonini boshlaymiz!</b>",
