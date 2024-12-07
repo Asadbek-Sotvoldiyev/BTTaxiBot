@@ -1,0 +1,31 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up SSH key for AWS access
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.AWS_SSH_PRIVATE_KEY }}
+
+      - name: Pull the latest changes from GitHub
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@54.175.19.79 'cd /var/www/BTTaxiBot && git pull origin main'
+
+      - name: Restart services
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@54.175.19.79 << 'EOF'
+            sudo systemctl restart nginx
+            sudo systemctl restart telegram_bot.service
+            sudo systemctl restart gunicorn.service
+          EOF
