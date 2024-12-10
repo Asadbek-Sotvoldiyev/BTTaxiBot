@@ -27,7 +27,7 @@ def create_bot_user(chat_id, full_name, phone_number):
     return BotUser.objects.create(
         chat_id=chat_id,
         full_name=full_name,
-        phone_number=phone_number
+        phone_number=f"+{str(phone_number)}"
     )
 
 @sync_to_async
@@ -214,59 +214,69 @@ async def activate_group(message: Message):
 
 @dp.message(F.contact)
 async def handle_contact(message: Message):
-    if not await check_user(message.chat.id):
-        if message.contact and message.contact.phone_number:
-            phone_number = message.contact.phone_number
-            name = f'{message.chat.first_name if message.chat.first_name else ""} {message.chat.last_name if message.chat.last_name else ""}'
-            await create_bot_user(message.chat.id, name, phone_number)
-            await message.answer(
-                f"👤 *Ism familiyangiz:* `{name}`\n"
-                f"📞 *Raqamingiz saqlandi:* `{phone_number}`",
-                reply_markup=ReplyKeyboardRemove(),
-                parse_mode="Markdown"
-            )
+    if message.chat.type == 'private':
+        if not await check_user(message.chat.id):
+            if message.contact and message.contact.phone_number:
+                phone_number = message.contact.phone_number
+                name = f'{message.chat.first_name if message.chat.first_name else ""} {message.chat.last_name if message.chat.last_name else ""}'
+                await create_bot_user(message.chat.id, name, phone_number)
+                await message.answer(
+                    f"👤 *Ism familiyangiz:* `{name}`\n"
+                    f"📞 *Raqamingiz saqlandi:* `+{phone_number}`",
+                    reply_markup=ReplyKeyboardRemove(),
+                    parse_mode="Markdown"
+                )
 
-            await send_welcome(message)
+                await send_welcome(message)
+            else:
+                await message.answer(
+                    "📱 <b>Iltimos, telefon raqamingizni yuboring:</b>",
+                    reply_markup=phone_button,
+                    parse_mode="HTML"
+                )
+
         else:
-            await message.answer(
-                "📱 <b>Iltimos, telefon raqamingizni yuboring:</b>",
-                reply_markup=phone_button,
-                parse_mode="HTML"
-            )
-
-    else:
-        await send_welcome(message)
+            await send_welcome(message)
 
 @dp.message(F.text == "🚕 Buyurtma berish 🚕")
 async def handle_order(message: Message):
-    await message.answer(
-        "🛒 <b>Buyurtma berish jarayonini boshlaymiz!</b>",
-        parse_mode="HTML"
-    )
+    if await check_user(message.chat.id):
+        if message.chat.type == "private":
+            await message.answer(
+                "🛒 <b>Buyurtma berish jarayonini boshlaymiz!</b>",
+                parse_mode="HTML"
+            )
 
-    button1 = InlineKeyboardButton(
-        text="🚕 Beshariq → Toshkent",
-        callback_data="beshariq_toshkent"
-    )
-    button2 = InlineKeyboardButton(
-        text="🚕 Toshkent → Beshariq",
-        callback_data="toshkent_beshariq"
-    )
+            button1 = InlineKeyboardButton(
+                text="🚕 Beshariq → Toshkent",
+                callback_data="beshariq_toshkent"
+            )
+            button2 = InlineKeyboardButton(
+                text="🚕 Toshkent → Beshariq",
+                callback_data="toshkent_beshariq"
+            )
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[[button1, button2]])
-    await message.answer(
-        "<b>Buyurtma ma'lumotlari:</b>\n\n"
-        "📍 <b>Yo'nalishingiz:</b> <i>------------</i>\n"
-        "👥 <b>Necha kishi:</b> <i>-------------</i>\n"
-        "📍 <b>Ketish joyi:</b> <i>-------------------</i>",
-        parse_mode="HTML"
-    )
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[[button1, button2]])
+            await message.answer(
+                "<b>Buyurtma ma'lumotlari:</b>\n\n"
+                "📍 <b>Yo'nalishingiz:</b> <i>------------</i>\n"
+                "👥 <b>Necha kishi:</b> <i>-------------</i>\n"
+                "📍 <b>Ketish joyi:</b> <i>-------------------</i>",
+                parse_mode="HTML"
+            )
 
-    await message.answer(
-        "🚖 <b>Yo'nalishni tanlang:</b>",
-        reply_markup=keyboard,
-        parse_mode="HTML"
-    )
+            await message.answer(
+                "🚖 <b>Yo'nalishni tanlang:</b>",
+                reply_markup=keyboard,
+                parse_mode="HTML"
+            )
+    else:
+        await message.answer(
+            "<b>Assalomu alaykum!</b>\n\n"
+            "📱 <i>Iltimos, raqamingizni yuboring:</i>",
+            reply_markup=phone_button,
+            parse_mode="HTML"
+        )
 
 
 @dp.callback_query()
@@ -278,80 +288,84 @@ async def handle_button_click(callback_query: CallbackQuery):
     user = await get_user(chat_id)
 
     if selected_option in ['beshariq_toshkent', 'toshkent_beshariq']:
-        await create_order(selected_option, user)
+        if callback_query.message.chat.type == "private":
+            await create_order(selected_option, user)
 
-        await callback_query.message.delete()
+            await callback_query.message.delete()
 
-        await callback_query.message.answer(
-            f"<b>Buyurtma ma'lumotlari:</b>\n\n"
-            f"📍 <b>Yo'nalishingiz:</b> <i>{options[selected_option]}</i>\n"
-            f"👥 <b>Necha kishi:</b> <i>-------------</i>\n"
-            f"📍 <b>Ketish joyi:</b> <i>-------------------</i>",
-            parse_mode="HTML"
-        )
+            await callback_query.message.answer(
+                f"<b>Buyurtma ma'lumotlari:</b>\n\n"
+                f"📍 <b>Yo'nalishingiz:</b> <i>{options[selected_option]}</i>\n"
+                f"👥 <b>Necha kishi:</b> <i>-------------</i>\n"
+                f"📍 <b>Ketish joyi:</b> <i>-------------------</i>",
+                parse_mode="HTML"
+            )
 
-        button1 = InlineKeyboardButton(text="1", callback_data="1")
-        button2 = InlineKeyboardButton(text="2", callback_data="2")
-        button3 = InlineKeyboardButton(text="3", callback_data="3")
-        button4 = InlineKeyboardButton(text="4", callback_data="4")
+            button1 = InlineKeyboardButton(text="1", callback_data="1")
+            button2 = InlineKeyboardButton(text="2", callback_data="2")
+            button3 = InlineKeyboardButton(text="3", callback_data="3")
+            button4 = InlineKeyboardButton(text="4", callback_data="4")
 
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[[button1, button2], [button3, button4]])
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[[button1, button2], [button3, button4]])
 
-        await callback_query.message.answer(
-            "👥 <b>Nechta joy kerak:</b>",
-            reply_markup=keyboard,
-            parse_mode="HTML"
-        )
+            await callback_query.message.answer(
+                "👥 <b>Nechta joy kerak:</b>",
+                reply_markup=keyboard,
+                parse_mode="HTML"
+            )
 
     elif selected_option in ['1', '2', '3', '4']:
-        order = await update_order(selected_option, user)
+        if callback_query.message.chat.type == "private":
+            order = await update_order(selected_option, user)
 
-        await callback_query.message.delete()
+            await callback_query.message.delete()
 
-        await callback_query.message.answer(
-            f"<b>Buyurtma ma'lumotlari:</b>\n\n"
-            f"📍 <b>Yo'nalishingiz:</b> {options[order.direction]}\n"
-            f"👥 <b>Necha kishi:</b> {order.person_count}\n"
-            f"📍 <b>Ketish joyi:</b> -------------------",
-            parse_mode='HTML'
-        )
+            await callback_query.message.answer(
+                f"<b>Buyurtma ma'lumotlari:</b>\n\n"
+                f"📍 <b>Yo'nalishingiz:</b> {options[order.direction]}\n"
+                f"👥 <b>Necha kishi:</b> {order.person_count}\n"
+                f"📍 <b>Ketish joyi:</b> -------------------",
+                parse_mode='HTML'
+            )
 
-        await callback_query.message.answer(
-            "📍 <b>Ketish joyini lokatsiyasini yuboring:</b>",
-            parse_mode='HTML'
-        )
+            await callback_query.message.answer(
+                "📍 <b>Ketish joyini lokatsiyasini yuboring:</b>",
+                parse_mode='HTML'
+            )
 
 
     elif selected_option in ['ha', 'yoq']:
-        if selected_option == 'yoq':
-            await callback_query.message.delete()
-            await callback_query.message.answer(
-                "❌ <b>Buyurtmangiz rad etildi.</b>\n"
-                "🔄 <i>Bot qayta ishga tushiriladi...</i>",
-                parse_mode="HTML"
-            )
+        if callback_query.message.chat.type == "private":
+            if selected_option == 'yoq':
+                await callback_query.message.delete()
+                await callback_query.message.answer(
+                    "❌ <b>Buyurtmangiz rad etildi.</b>\n"
+                    "🔄 <i>Bot qayta ishga tushiriladi...</i>",
+                    parse_mode="HTML"
+                )
 
-            await send_welcome(callback_query.message)
-        elif selected_option=='ha':
-            groups = await get_groups()
-            order = await get_order(user)
-            user = await get_user_from_order(order)
-            text = f"{order.id}-<b>raqamli buyurtma:</b>\n\n" + \
-                f"👤 <b>F.I.O:</b> {user.full_name}\n" + \
-                f"📱 <b>Telefon raqami:</b> {user.phone_number}\n" + \
-                f"📍 <b>Yo'nalish:</b> <i>{options[order.direction]}</i>\n" + \
-                f"👥 <b>Yo'lovchilar soni:</b> <i>{order.person_count}</i>\n" + \
-                f"📍 <b>Ketish joyi:</b> <i><a href='{order.from_location}'>Google Maps'da ko'rish</a></i>"
+                await send_welcome(callback_query.message)
+            elif selected_option == 'ha':
+                groups = await get_groups()
+                order = await get_order(user)
+                user = await get_user_from_order(order)
+                user_link = f'<a href="tg://user?id={user.chat_id}">{user.full_name}</a>'
+                text = f"{order.id}-<b>raqamli buyurtma:</b>\n\n" + \
+                       f"👤 <b>F.I.O:</b> {user_link}\n" + \
+                       f"📱 <b>Telefon raqami:</b> {user.phone_number}\n" + \
+                       f"📍 <b>Yo'nalish:</b> <i>{options[order.direction]}</i>\n" + \
+                       f"👥 <b>Yo'lovchilar soni:</b> <i>{order.person_count}</i>\n" + \
+                       f"📍 <b>Ketish joyi:</b> <i><a href='{order.from_location}'>Google Maps'da ko'rish</a></i>"
 
-            await callback_query.message.answer(text, parse_mode="HTML")
-            await bot.delete_message(chat_id, message_id)
-            async for gr in groups:
-                await send_message_to_group(gr.chat_id, text)
-            await callback_query.message.answer(
-                "✅ <b>Buyurtmangiz qabul qilindi.</b>\n"
-                "⏳ <i>Tez orada sizga xabar beramiz...</i>",
-                parse_mode="HTML"
-            )
+                await callback_query.message.answer(text, parse_mode="HTML")
+                await bot.delete_message(chat_id, message_id)
+                async for gr in groups:
+                    await send_message_to_group(gr.chat_id, text)
+                await callback_query.message.answer(
+                    "✅ <b>Buyurtmangiz qabul qilindi.</b>\n"
+                    "⏳ <i>Tez orada sizga xabar beramiz...</i>",
+                    parse_mode="HTML"
+                )
 
 
     elif selected_option == "accept":
@@ -381,9 +395,10 @@ async def handle_button_click(callback_query: CallbackQuery):
                 await bot.send_message(chat_id, reply_text, parse_mode='HTML')
             else:
                 if original_text != text or original_markup != new_markup:
+                    mention_link = f'<a href="tg://user?id={driver.chat_id}">{driver.full_name}</a>'
                     new_text = f"{order.id}-<b>buyurtmangiz qabul qilindi</b>\n\n" + \
                                f"<b>🚗 Haydovchi ma'lumotlari:</b>\n" + \
-                               f"<b>👤 F.I.O:</b> {order.driver.full_name}\n" + \
+                               f"<b>👤 F.I.O:</b> {mention_link}\n" + \
                                f"<b>📞 Telefon raqami:</b> {order.driver.phone_number}\n" + \
                                f"<b>🚙 Mashina:</b> {order.driver.car_info}"
 
@@ -396,8 +411,9 @@ async def handle_button_click(callback_query: CallbackQuery):
                     else:
                         print("Foydalanuvchining chat_id topilmadi.")
 
+                    user_link = f'<a href="tg://user?id={order_user.chat_id}">{order_user.full_name}</a>'
                     driver_text = f"{order.id}-<b>raqamli buyurtma:</b>\n\n" + \
-                           f"👤 <b>F.I.O:</b> {order_user.full_name}\n" + \
+                           f"👤 <b>F.I.O:</b> {user_link}\n" + \
                            f"📱 <b>Telefon raqami:</b> {order_user.phone_number}\n" + \
                            f"📍 <b>Yo'nalish:</b> <i>{options[order.direction]}</i>\n" + \
                            f"👥 <b>Yo'lovchilar soni:</b> <i>{order.person_count}</i>\n" + \
@@ -419,9 +435,8 @@ async def handle_button_click(callback_query: CallbackQuery):
 
         else:
             await callback_query.answer(
-                "⚠️ <b>Sizning hisobingizda noaniqlik mavjud.</b>\n"
-                "📞 <i>Iltimos, administrator bilan bog'laning.</i>",
-                parse_mode="HTML"
+                "⚠️ Sizning hisobingizda noaniqlik mavjud."
+                "Iltimos, administrator bilan bog'laning."
             )
 
 
@@ -437,58 +452,60 @@ async def send_message_to_group(chat_id: int, message_text: str):
 
 @dp.message(F.content_type == ContentType.LOCATION)
 async def handle_location(message: Message):
-    chat_id = message.chat.id
-    options = {"beshariq_toshkent": "Beshariq-Toshkent", "toshkent_beshariq": "Toshkent-Beshariq"}
-    user = await get_user(chat_id)
-    latitude = message.location.latitude
-    longitude = message.location.longitude
+    if message.chat.type == "private":
+        chat_id = message.chat.id
+        options = {"beshariq_toshkent": "Beshariq-Toshkent", "toshkent_beshariq": "Toshkent-Beshariq"}
+        user = await get_user(chat_id)
+        latitude = message.location.latitude
+        longitude = message.location.longitude
 
-    maps_link = f"https://www.google.com/maps?q={latitude},{longitude}"
+        maps_link = f"https://www.google.com/maps?q={latitude},{longitude}"
 
-    if user is not None:
-        order = await update_order_location(user, maps_link)
+        if user is not None:
+            order = await update_order_location(user, maps_link)
 
-        await message.answer(
-            f"<b>Buyurtma ma'lumotlari:</b>\n\n"
-            f"📍 <b>Yo'nalishingiz:</b> {options[order.direction]}\n"
-            f"👥 <b>Necha kishi:</b> {order.person_count}\n"
-            f"📍 <b>Ketish joyi:</b> <a href='{order.from_location}'>Google Maps'da ko'rish</a>",
-            parse_mode='HTML'
-        )
+            await message.answer(
+                f"<b>Buyurtma ma'lumotlari:</b>\n\n"
+                f"📍 <b>Yo'nalishingiz:</b> {options[order.direction]}\n"
+                f"👥 <b>Necha kishi:</b> {order.person_count}\n"
+                f"📍 <b>Ketish joyi:</b> <a href='{order.from_location}'>Google Maps'da ko'rish</a>",
+                parse_mode='HTML'
+            )
 
-        button1 = InlineKeyboardButton(text="✅ Ha", callback_data="ha")
-        button2 = InlineKeyboardButton(text="❌ Yo'q", callback_data="yoq")
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[[button1, button2]])
+            button1 = InlineKeyboardButton(text="✅ Ha", callback_data="ha")
+            button2 = InlineKeyboardButton(text="❌ Yo'q", callback_data="yoq")
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[[button1, button2]])
 
-        await message.answer(
-            "✅ <b>Ma'lumotlarni tasdiqlaysizmi?</b>",
-            reply_markup=keyboard,
-            parse_mode='HTML'
-        )
+            await message.answer(
+                "✅ <b>Ma'lumotlarni tasdiqlaysizmi?</b>",
+                reply_markup=keyboard,
+                parse_mode='HTML'
+            )
 
 
 
 @dp.message()
 async def handle_message(message: Message):
-    text = message.text
-    chat_id = message.chat.id
-    options = {"beshariq_toshkent": "Beshariq-Toshkent", "toshkent_beshariq": "Toshkent-Beshariq"}
-    user = await get_user(chat_id)
-    if user is not None:
-        order = await update_order_time(user, text[5:])
+    if message.chat.type == "private":
+        text = message.text
+        chat_id = message.chat.id
+        options = {"beshariq_toshkent": "Beshariq-Toshkent", "toshkent_beshariq": "Toshkent-Beshariq"}
+        user = await get_user(chat_id)
+        if user is not None:
+            order = await update_order_time(user, text[5:])
 
-        await message.answer(
-            f"<b>Buyurtma ma'lumotlari:</b>\n\n"
-            f"📍 <b>Yo'nalishingiz:</b> {options[order.direction]}\n"
-            f"👥 <b>Necha kishi:</b> {order.person_count}\n"
-            f"📍 <b>Ketish joyi:</b> -------------------",
-            parse_mode='HTML'
-        )
+            await message.answer(
+                f"<b>Buyurtma ma'lumotlari:</b>\n\n"
+                f"📍 <b>Yo'nalishingiz:</b> {options[order.direction]}\n"
+                f"👥 <b>Necha kishi:</b> {order.person_count}\n"
+                f"📍 <b>Ketish joyi:</b> -------------------",
+                parse_mode='HTML'
+            )
 
-        await message.answer(
-            "📍 <b>Ketish joyini lokatsiyasini yuboring:</b>",
-            parse_mode='HTML'
-        )
+            await message.answer(
+                "📍 <b>Ketish joyini lokatsiyasini yuboring:</b>",
+                parse_mode='HTML'
+            )
 
 
 
